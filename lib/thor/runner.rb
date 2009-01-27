@@ -126,7 +126,8 @@ class Thor::Runner < Thor
   desc "list [SEARCH]", "list the available thor tasks (--substring means SEARCH can be anywhere in the module)"
   method_options :substring => :boolean,
                  :group => :optional,
-                 :all => :boolean
+                 :all => :boolean,
+                 ['--descriptions', '-D'] => :boolean
   def list(search = "")
     initialize_thorfiles
     search = ".*#{search}" if options["substring"]
@@ -137,7 +138,7 @@ class Thor::Runner < Thor
       (options[:all] || k.group_name == group) && 
       Thor::Util.constant_to_thor_path(k.name) =~ search
     end
-    display_klasses(false, classes)
+    display_klasses(false, classes, options.descriptions?)
   end
 
   # Override Thor#help so we can give info about not-yet-loaded tasks
@@ -191,7 +192,7 @@ class Thor::Runner < Thor
     File.open(yaml_file, "w") {|f| f.puts yaml.to_yaml }
   end
   
-  def display_klasses(with_modules = false, klasses = Thor.subclasses)
+  def display_klasses(with_modules = false, klasses = Thor.subclasses, show_descriptions = false)
     klasses -= [Thor, Thor::Runner] unless with_modules
     raise Error, "No Thor tasks available" if klasses.empty?
     
@@ -216,13 +217,13 @@ class Thor::Runner < Thor
     
     unless klasses.empty?
       puts # add some spacing
-      klasses.each { |klass| display_tasks(klass) }
+      klasses.each { |klass| display_tasks(klass, show_descriptions) }
     else
       puts "\033[1;34mNo Thor tasks available\033[0m"
     end
   end  
   
-  def display_tasks(klass)
+  def display_tasks(klass, show_descriptions)
     if klass.tasks.values.length > 1
       
       base = Thor::Util.constant_to_thor_path(klass.name)
@@ -237,9 +238,13 @@ class Thor::Runner < Thor
       
       klass.tasks.each true do |name, task|
         puts task.formatted_usage(true)
-        puts ' ' * 4 + task.description
-        puts
+        if show_descriptions
+          puts ' ' * 4 + task.description
+          puts
+        end
       end
+      
+      puts unless show_descriptions
       
       unless klass.opts.empty?
         puts "\nglobal options: #{Options.new(klass.opts)}"
